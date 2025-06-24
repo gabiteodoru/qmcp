@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qmcp"
-version = "0.3.0"
+version = "0.3.1"
 description = "MCP Server for q/kdb+ integration"
 authors = [{name = "Gabi Teodoru", email = "gabiteodoru@gmail.com"}]
 license = {text = "MIT"}
