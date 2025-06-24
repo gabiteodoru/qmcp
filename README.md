@@ -58,14 +58,14 @@ claude mcp add qmcp "uv run qmcp/server.py"
 #### Option 1: pip (recommended for global use)
 
 ```bash
-pip install -e .
+pip install qmcp
 ```
 
 *Note: Consider using a virtual environment to avoid dependency conflicts:*
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -e .
+pip install qmcp
 ```
 
 #### Option 2: uv (for project-specific use)
