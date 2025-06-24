@@ -20,12 +20,28 @@ MCP is an open protocol created by Anthropic that enables AI systems to interact
 
 For first-time users, the fastest way to get started:
 
-1. Start a q server (e.g., `q -p 5001`)
+1. Start a q server:
+   ```bash
+   q -p 5001
+   ```
 2. Add qmcp to Claude CLI:
    ```bash
    claude mcp add qmcp "uv run qmcp/server.py"
    ```
-3. Start using it with Claude CLI!
+3. Start using Claude CLI:
+   ```bash
+   claude
+   ```
+   Then interact with qmcp:
+   ```
+   > connect to port 5001 and compute 2+2
+
+   ● qmcp:connect_to_q (MCP)(host: "5001")
+     ⎿  true
+
+   ● qmcp:query_q (MCP)(command: "2+2")
+     ⎿  4
+   ```
 
 ## Installation
 
@@ -114,23 +130,6 @@ qmcp
 **With lightweight installation:**
 The server starts automatically when Claude CLI uses it (no manual start needed).
 
-### Demo
-
-First, start a q server:
-```bash
-q -p 5001
-```
-
-Then use qmcp with Claude CLI:
-```
-> connect to port 5001 and compute 2+2
-
-● qmcp:connect_to_q (MCP)(host: "5001")
-  ⎿  true
-
-● qmcp:query_q (MCP)(command: "2+2")
-  ⎿  4
-```
 
 ### Environment Variables
 
