@@ -1,6 +1,8 @@
 # qmcp Server
 
-A Model Context Protocol server for q/kdb+ integration.
+A Model Context Protocol (MCP) server for q/kdb+ integration.
+
+MCP is an open protocol created by Anthropic that enables AI systems to interact with external tools and data sources. While currently supported by Claude (Desktop and CLI), the open standard allows other LLMs to adopt it in the future.
 
 ## Features
 
@@ -16,8 +18,77 @@ A Model Context Protocol server for q/kdb+ integration.
 
 ## Installation
 
+### Lightweight Installation (Claude CLI only)
+
+Run directly with uv (no pip installation required, may be slower on startup; best for trying it out at first):
+
+```bash
+claude mcp add qmcp "uv run qmcp/server.py"
+```
+
+### Full Installation
+
+##### Option 1: pip (recommended for global use)
+
 ```bash
 pip install -e .
+```
+
+*Note: Consider using a virtual environment to avoid dependency conflicts:*
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -e .
+```
+
+##### Option 2: uv (for project-specific use)
+
+```bash
+# One-time execution (downloads dependencies each time)
+uv run qmcp
+
+# Or for frequent use, sync dependencies first
+uv sync
+uv run qmcp
+```
+
+#### Adding to Claude CLI
+
+After full installation, add the server to Claude CLI:
+
+```bash
+claude mcp add qmcp qmcp
+```
+
+#### Adding to Claude Desktop
+
+Add to your Claude Desktop configuration file:
+
+```json
+{
+  "mcpServers": {
+    "qmcp": {
+      "command": "qmcp"
+    }
+  }
+}
+```
+
+For uv-based installation:
+```json
+{
+  "mcpServers": {
+    "qmcp": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/absolute/path/to/qmcp",
+        "run",
+        "qmcp"
+      ]
+    }
+  }
+}
 ```
 
 ## Usage
