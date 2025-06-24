@@ -49,3 +49,18 @@ The `connect_to_q(host)` tool uses flexible fallback logic:
 
 1. `connect_to_q(host=None)` - Connect to q server with fallback logic
 2. `query_q(command)` - Execute q commands and return results
+
+### Known Limitations
+
+When using the MCP server, be aware of these limitations:
+
+- **Keyed tables**: Operations like `1!table` may fail during pandas conversion
+- **String vs Symbol distinction**: q strings and symbols may appear identical in output
+- **Type ambiguity**: Use q's `meta` and `type` commands to determine actual data types when precision matters
+- **Pandas conversion**: Some q-specific data structures may not convert properly to pandas DataFrames
+
+For type checking, use:
+```q
+meta table           / Check table column types and structure
+type variable        / Check variable type
+```

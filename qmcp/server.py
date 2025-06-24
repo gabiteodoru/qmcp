@@ -57,6 +57,12 @@ def query_q(command: str) -> str:
         - pandas DataFrames as readable string tables
         - Lists, dicts, numbers as native Python types
         - Error message string if query fails
+        
+    Known Limitations:
+        - Keyed tables (e.g., 1!table) may fail during pandas conversion
+        - Strings and symbols may appear identical in output
+        - Use `meta table` and `type variable` for precise type information
+        - Some q-specific structures may not convert properly to pandas
     """
     global _q_connection
     if _q_connection is None:
