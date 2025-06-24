@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qmcp"
+version = "0.1.0"
+description = "MCP Server for q/kdb+ integration"
+authors = [{name = "Gabi Teodoru", email = "gabiteodoru@gmail.com"}]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "mcp",
+    "numpy>=1.8.0",
+    "pandas",
+    "more_itertools",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/gabiteodoru/qmcp"
+"Bug Tracker" = "https://github.com/gabiteodoru/qmcp/issues"
+"Source Code" = "https://github.com/gabiteodoru/qmcp"
+
+[project.scripts]
+qmcp = "qmcp.server:main"
