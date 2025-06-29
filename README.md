@@ -9,6 +9,65 @@ MCP is an open protocol created by Anthropic that enables AI systems to interact
 - Connect to q/kdb+ servers
 - Execute q queries and commands
 - Persistent connection management
+- Intelligent async query handling with configurable timeouts
+- Programmatic query cancellation (Ctrl+C equivalent)
+- Graceful handling of long-running queries
+
+## Architecture & Design Philosophy
+
+### Intended Goals
+
+**qmcp** is designed to provide AI coding assistants with **controlled access** to q/kdb+ databases for development and debugging workflows:
+
+1. **Development-Focused**: Optimized for coding tools working with debug/dev q servers
+2. **Query Control**: AI can interrupt long-running queries (equivalent to developer Ctrl+C)
+3. **Predictable Behavior**: Sequential execution prevents resource conflicts during development
+4. **Configurable Timeouts**: Customizable timing for different development scenarios
+
+### Design Logic
+
+The server architecture makes deliberate choices for AI-assisted development workflows:
+
+#### **Single Connection Model**
+- **Why**: Simplifies development debugging - one connection, clear state
+- **Benefit**: Matches typical developer workflow with single q session
+- **Implementation**: One persistent connection per MCP session
+
+#### **Sequential Query Execution**
+- **Why**: Development environments don't need concurrent query support
+- **Benefit**: Predictable resource usage, easier debugging, prevents query interference
+- **Implementation**: New queries rejected while another is running
+
+#### **Smart Async Switching with Configurable Timeouts**
+```
+Fast Query (< async switch timeout)  →  Return result immediately
+Slow Query (> async switch timeout)  →  Switch to async mode
+                                     →  Auto-interrupt after interrupt timeout (if configured)
+```
+- **Why**: Keeps AI coding sessions responsive while allowing complex development queries
+- **Benefit**: Immediate feedback for quick queries, progress tracking for analysis
+- **Customization**: All timeouts configurable via MCP tools
+
+#### **AI-Controlled Query Interruption**
+- **Why**: AI coding tools need ability to cancel runaway queries (like developer Ctrl+C)
+- **How**: MCP server locates q process by port and sends SIGINT after configurable timeout
+- **Benefit**: Prevents development sessions from hanging on problematic queries
+- **Limitation**: SIGINT functionality not implemented when MCP server and q session run on opposite sides of WSL/Windows divide
+
+#### **Development-Oriented Process Management**
+- **Why**: Coding tools work with user-managed development q servers
+- **Benefit**: Developer controls q server lifecycle, AI controls query execution
+- **Design**: MCP server provides query interruption capability without server lifecycle management
+
+### Why This Design Makes Sense for Coding Tools
+
+1. **Development Workflow**: Matches how developers interact with q - single session, iterative queries
+2. **AI Safety**: Prevents AI from overwhelming development environments with concurrent requests
+3. **Debugging-Friendly**: Sequential execution makes it easier to trace issues
+4. **Responsive**: Async handling prevents AI coding sessions from blocking
+5. **Configurable**: Timeouts can be tuned for different development scenarios
+
+This architecture provides AI coding assistants with effective q/kdb+ access while maintaining the predictable, controlled environment that development workflows require.
 
 ## Requirements
 
@@ -152,6 +211,12 @@ The `connect_to_q(host)` tool uses flexible fallback logic:
 
 1. `connect_to_q(host=None)` - Connect to q server with fallback logic
 2. `query_q(command)` - Execute q commands and return results
+3. `set_timeout_switch_to_async(seconds)` - Configure when queries switch to async mode
+4. `set_timeout_interrupt_q(seconds)` - Configure when to send SIGINT to cancel queries
+5. `set_timeout_connection(seconds)` - Configure connection timeout
+6. `get_timeout_settings()` - View current timeout configuration
+7. `get_current_task_status()` - Check status of running async query
+8. `get_current_task_result()` - Retrieve result of completed async query
 
 ## Known Limitations
 

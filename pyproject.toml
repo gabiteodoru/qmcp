@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qmcp"
-version = "0.3.1"
+version = "0.4.0"
 description = "MCP Server for q/kdb+ integration"
 authors = [{name = "Gabi Teodoru", email = "gabiteodoru@gmail.com"}]
 license = {text = "MIT"}
@@ -15,6 +15,7 @@ dependencies = [
     "numpy>=1.8.0",
     "pandas",
     "more_itertools",
+    "psutil",
 ]
 
 [project.urls]

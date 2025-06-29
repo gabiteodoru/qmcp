@@ -55,3 +55,9 @@ htmlcov/
 
 # Documentation
 docs/_build/
+
+# Local scripts
+reinstallmcp.sh
+debug_server.sh
+test_mcp.py
+test_server.sh

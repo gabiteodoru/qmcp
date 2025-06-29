@@ -51,17 +51,18 @@ class _QDecodeWrapper:
             rd = r.meta.as_dict()
             for col in rd:
                 if rd[col] in (0, 11):  # string or symbol columns
-                    r[col] = r[col].map(dmap(lambda x: x.decode('utf-8'), r[col].drop_duplicates()))
+                    r[col] = r[col].map(dmap(lambda x: x.decode('utf-8') if isinstance(x, bytes) else x, r[col].drop_duplicates()))
                     
         return r
 
 
-def connect_to_q(host=None):
+def connect_to_q(host=None, connection_timeout=5):
     """
     Connect to q server with flexible fallback logic for MCP
     
     Args:
         host: None, port number, 'host:port', or full connection string
+        connection_timeout: seconds to wait for connection (default 5)
         
     Fallback logic:
     1. If host has colons, use directly (ignores Q_DEFAULT_HOST)
@@ -74,7 +75,7 @@ def connect_to_q(host=None):
     """
     # 4) If host has colons, use it directly (ignore Q_DEFAULT_HOST)
     if host and ':' in str(host):
-        return _qConnect(str(host), True)
+        return _qConnect(str(host), True, connection_timeout)
     
     # Get Q_DEFAULT_HOST environment variable
     default_host = os.environ.get('Q_DEFAULT_HOST')
@@ -92,29 +93,30 @@ def connect_to_q(host=None):
             if len(parts) >= 2:
                 # Replace port in Q_DEFAULT_HOST
                 parts[1] = port
-                return _qConnect(':'.join(parts), True)
+                return _qConnect(':'.join(parts), True, connection_timeout)
             else:
                 # Q_DEFAULT_HOST is just hostname
-                return _qConnect(f"{default_host}:{port}", True)
+                return _qConnect(f"{default_host}:{port}", True, connection_timeout)
         else:
             # No Q_DEFAULT_HOST, use localhost
-            return _qConnect(f"localhost:{port}", True)
+            return _qConnect(f"localhost:{port}", True, connection_timeout)
     
     # 1) Use Q_DEFAULT_HOST (host, host:port, or host:port:user:passwd)
     if default_host:
-        return _qConnect(default_host, True)
+        return _qConnect(default_host, True, connection_timeout)
     
     # Should never reach here due to check above
     raise ValueError("Invalid connection parameters")
 
 
-def _qConnect(qCredentials, pandas):
+def _qConnect(qCredentials, pandas, connection_timeout=5):
     """
-    Connect to q server with retry logic
+    Connect to q server with socket timeout
     
     Args:
         qCredentials: 'host:port' or 'host:port:user:passwd'
         pandas: return pandas-enabled connection
+        connection_timeout: socket timeout in seconds
         
     Returns:
         QConnection or _QDecodeWrapper
@@ -126,18 +128,17 @@ def _qConnect(qCredentials, pandas):
     if host == _get_hostname():
         host = 'localhost'
         
-    # Retry connection for up to 5 seconds
-    t = time.time()    
-    while time.time() - t < 5:
-        try:
-            q = QConnection(host, port, user, passwd, pandas=pandas)
-            q.open()
-            return _QDecodeWrapper(q) if pandas else q
-        except Exception as e:
-            print(f"Connection attempt failed: {e}")
-            time.sleep(0.1)
-            
-    # Final attempt without retry
+    # Create connection with socket timeout
     q = QConnection(host, port, user, passwd, pandas=pandas)
-    q.open()
-    return _QDecodeWrapper(q) if pandas else q
+    
+    # Set socket timeout before opening connection
+    import socket
+    original_timeout = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(connection_timeout)
+    
+    try:
+        q.open()
+        return _QDecodeWrapper(q) if pandas else q
+    finally:
+        # Restore original socket timeout
+        socket.setdefaulttimeout(original_timeout)
