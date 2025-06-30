@@ -23,6 +23,7 @@ try:
     # Import from the bundled qpython
     import qpython.qconnection as _qconnection
     from qpython import MetaData as _MetaData
+    from qpython import qtype
     
     # Create our exports
     QConnection = _qconnection.QConnection

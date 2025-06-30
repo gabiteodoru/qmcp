@@ -14,6 +14,8 @@ import psutil
 import signal
 import os
 from . import qlib
+from .util import getTimeoutsStr, find_process_by_port
+from . import codehelper
 
 # Initialize the MCP server
 mcp = FastMCP("qmcp")
@@ -31,24 +33,10 @@ _connection_timeout = 2          # seconds to wait for connection to establish
 # Async task management
 _current_async_task = None       # Single async task: {"thread": Thread, "status": str, "command": str, "started": float, "result_container": dict}
 
-def getTimeoutsStr():
-    async_setting = f"{_switch_to_async_timeout}s" if _switch_to_async_timeout else "disabled"
-    interrupt_setting = f"{_interrupt_timeout}s" if _interrupt_timeout else "disabled"
-    connection_setting = f"{_connection_timeout}s"
-    return f"Timeouts: async_switch={async_setting}, interrupt={interrupt_setting}, connection={connection_setting}"
+# Debug mode
+_DEBUG = False
 
-def find_process_by_port(port):
-    """Find PID of process listening on the specified port"""
-    if not port:
-        return None
-    try:
-        for conn in psutil.net_connections():
-            if (conn.laddr.port == port and 
-                conn.status == 'LISTEN'):
-                return conn.pid
-    except Exception:
-        pass
-    return None
+
 
 @mcp.tool()
 def connect_to_q(host: str = None) -> str:
@@ -86,12 +74,14 @@ def connect_to_q(host: str = None) -> str:
         if _connection_port and _q_process_pid is None:
             pid_status = " Warning: Failed to find q process PID - SIGINT functionality disabled. If q server is running across WSL-Windows divide, this is expected."
             
-        return f"Connected to q server. {getTimeoutsStr()}){pid_status}"
+        result = f"Connected to q server. {getTimeoutsStr(_switch_to_async_timeout, _interrupt_timeout, _connection_timeout)}){pid_status}"
+        return f"[connect_to_q] {result}" if _DEBUG else result
     except Exception as e:
         _q_connection = None
         _connection_port = None
         _q_process_pid = None        
-        raise ValueError(f"Connection failed: {str(e)}. {getTimeoutsStr()}")
+        error_msg = f"Connection failed: {str(e)}. {getTimeoutsStr(_switch_to_async_timeout, _interrupt_timeout, _connection_timeout)}"
+        raise ValueError(f"[connect_to_q] {error_msg}" if _DEBUG else error_msg)
 
 
 @mcp.tool()
@@ -116,15 +106,42 @@ def query_q(command: str) -> str:
         - Use `meta table` and `type variable` for precise type information
         - Some q-specific structures may not convert properly to pandas
     """
+    return _query_q(command)
+
+def _query_q(command: str, low_level = False, expr = None) -> str:
+    """
+    Execute q command using stored connection with async timeout switching
+    
+    Args:
+        command: q/kdb+ query or command to execute
+        
+    Returns:
+        Query result (if fast) or async task ID (if slow)
+        - Fast queries return results immediately  
+        - Slow queries switch to async mode and return task ID
+        - pandas DataFrames as readable string tables
+        - Lists, dicts, numbers as native Python types
+        - Error message string if query fails
+        
+    Known Limitations:
+        - Keyed tables (e.g., 1!table) may fail during pandas conversion
+        - Strings and symbols may appear identical in output
+        - Use `meta table` and `type variable` for precise type information
+        - Some q-specific structures may not convert properly to pandas
+    """
     global _q_connection, _current_async_task
     
     if _q_connection is None:
-        return "No active connection. Use connect_to_q first."
+        result = "No active connection. Use connect_to_q first."
+        return f"[_query_q] {result}" if _DEBUG else result
     
     # Check for existing running task
     if _current_async_task and _current_async_task["thread"].is_alive():
         elapsed = time.time() - _current_async_task["started"]
-        return f"Another query is already running ({elapsed:.1f}s elapsed). Check status with get_current_task_status()."
+        result = f"Another query is already running ({elapsed:.1f}s elapsed). Check status with get_current_task_status()."
+        return f"[_query_q] {result}" if _DEBUG else result
+    
+    if low_level: return _q_connection(command) if expr is None else _q_connection(command, expr)
     
     # Start query in thread immediately
     result_container = {"result": None, "error": None}
@@ -183,8 +200,10 @@ def query_q(command: str) -> str:
     if not thread.is_alive():
         # Fast query - return result immediately
         if result_container["error"]:
-            return f"Query failed: {result_container['error']}"
-        return result_container["result"]
+            result = f"Query failed: {result_container['error']}"
+            return f"[_query_q] {result}" if _DEBUG else result
+        result = result_container["result"]
+        return f"[_query_q] {result}" if _DEBUG else result
     else:
         # Slow query - switch to async mode
         _current_async_task = {
@@ -195,8 +214,29 @@ def query_q(command: str) -> str:
             "result_container": result_container
         }
         interrupt_msg = f" Will auto-interrupt after {_interrupt_timeout}s." if _interrupt_timeout else ""
-        return f"Query taking longer than {_switch_to_async_timeout}s, switched to async mode.{interrupt_msg} Check status with get_current_task_status()."
+        result = f"Query taking longer than {_switch_to_async_timeout}s, switched to async mode.{interrupt_msg} Check status with get_current_task_status()."
+        return f"[_query_q] {result}" if _DEBUG else result
 
+#@mcp.tool()
+def parse(expr: str) -> str:
+    """
+    Parse a q expression and return a human-readable representation
+    
+    This tool analyzes q code syntax and structure. Use this when q queries fail 
+    and you suspect syntax issues - it can help identify structural problems.
+    
+    Args:
+        expr: q expression to parse and analyze
+        
+    Returns:
+        Human-readable string representation of the parsed expression
+        
+    Example:
+        parse("a lj 2!select min s, maxs t from c") 
+        -> "[Func[lj], Symbol[a], [Func[!], Long[2], [Func[?], Symbol[c], [], Bool[0], Dict(LSymbol[s, t]: [[Func[min], Symbol[s]], [Func[maxs], Symbol[t]]])]]]"
+    """
+    result = codehelper.parse(_query_q, expr)
+    return f"[parse] {result}" if _DEBUG else result
 
 @mcp.tool()
 def set_timeout_switch_to_async(seconds: int = None) -> str:
@@ -212,14 +252,17 @@ def set_timeout_switch_to_async(seconds: int = None) -> str:
     global _switch_to_async_timeout
     
     if seconds is not None and seconds < 0:
-        return "Error: Timeout cannot be negative"
+        result = "Error: Timeout cannot be negative"
+        return f"[set_timeout_switch_to_async] {result}" if _DEBUG else result
     
     if seconds is None:
         _switch_to_async_timeout = None
-        return "Async switching disabled"
+        result = "Async switching disabled"
+        return f"[set_timeout_switch_to_async] {result}" if _DEBUG else result
     
     _switch_to_async_timeout = seconds
-    return f"Will switch to async mode after {seconds} seconds"
+    result = f"Will switch to async mode after {seconds} seconds"
+    return f"[set_timeout_switch_to_async] {result}" if _DEBUG else result
 
 
 @mcp.tool()
@@ -236,14 +279,17 @@ def set_timeout_interrupt_q(seconds: int = None) -> str:
     global _interrupt_timeout
     
     if seconds is not None and seconds < 0:
-        return "Error: Timeout cannot be negative"
+        result = "Error: Timeout cannot be negative"
+        return f"[set_timeout_interrupt_q] {result}" if _DEBUG else result
     
     if seconds is None:
         _interrupt_timeout = None
-        return "Auto-interrupt disabled"
+        result = "Auto-interrupt disabled"
+        return f"[set_timeout_interrupt_q] {result}" if _DEBUG else result
     
     _interrupt_timeout = seconds
-    return f"Will send SIGINT after {seconds} seconds"
+    result = f"Will send SIGINT after {seconds} seconds"
+    return f"[set_timeout_interrupt_q] {result}" if _DEBUG else result
 
 
 @mcp.tool()
@@ -260,14 +306,17 @@ def set_timeout_connection(seconds: int = None) -> str:
     global _connection_timeout
     
     if seconds is not None and seconds <= 0:
-        return "Error: Connection timeout must be positive"
+        result = "Error: Connection timeout must be positive"
+        return f"[set_timeout_connection] {result}" if _DEBUG else result
     
     if seconds is None:
         _connection_timeout = 5  # Default to qpython's original 5s
-        return "Connection timeout reset to default (5s)"
+        result = "Connection timeout reset to default (5s)"
+        return f"[set_timeout_connection] {result}" if _DEBUG else result
     
     _connection_timeout = seconds
-    return f"Connection timeout set to {seconds} seconds"
+    result = f"Connection timeout set to {seconds} seconds"
+    return f"[set_timeout_connection] {result}" if _DEBUG else result
 
 
 @mcp.tool()
@@ -278,7 +327,8 @@ def get_timeout_settings() -> str:
     Returns:
         Current timeout configuration
     """
-    return getTimeoutsStr()
+    result = getTimeoutsStr(_switch_to_async_timeout, _interrupt_timeout, _connection_timeout)
+    return f"[get_timeout_settings] {result}" if _DEBUG else result
 
 
 @mcp.tool()
@@ -295,7 +345,8 @@ def get_current_task_status(wait_seconds: int = None) -> str:
     global _current_async_task
     
     if not _current_async_task:
-        return "No async task running"
+        result = "No async task running"
+        return f"[get_current_task_status] {result}" if _DEBUG else result
     
     # Set default wait time to async switch timeout
     if wait_seconds is None:
@@ -311,17 +362,20 @@ def get_current_task_status(wait_seconds: int = None) -> str:
         # Check if task completed by checking thread status
         if not task["thread"].is_alive():
             if task["result_container"]["error"]:
-                return f"Query FAILED after {elapsed:.1f}s. Status: {task['status']}. Error: {task['result_container']['error']}"
+                result = f"Query FAILED after {elapsed:.1f}s. Status: {task['status']}. Error: {task['result_container']['error']}"
+                return f"[get_current_task_status] {result}" if _DEBUG else result
             else:
                 task["status"] = "Finished successfully" 
-                return f"Query COMPLETED after {elapsed:.1f}s. Use get_current_task_result() to retrieve result."
+                result = f"Query COMPLETED after {elapsed:.1f}s. Use get_current_task_result() to retrieve result."
+                return f"[get_current_task_status] {result}" if _DEBUG else result
         
         # Small polling interval to avoid busy waiting
         time.sleep(0.1)
     
     # Return running status after wait timeout
     elapsed = time.time() - task["started"]
-    return f"Query RUNNING ({elapsed:.1f}s elapsed). Command: {task['command'][:50]}{'...' if len(task['command']) > 50 else ''}"
+    result = f"Query RUNNING ({elapsed:.1f}s elapsed). Command: {task['command'][:50]}{'...' if len(task['command']) > 50 else ''}"
+    return f"[get_current_task_status] {result}" if _DEBUG else result
 
 
 @mcp.tool()
@@ -335,19 +389,29 @@ def interrupt_current_query() -> str:
     global _current_async_task, _q_process_pid, _connection_port
     
     if not _current_async_task:
-        return "No async task running to interrupt"
+        result = "No async task running to interrupt"
+        return f"[interrupt_current_query] {result}" if _DEBUG else result
     
     if not _q_process_pid:
-        return "Cannot interrupt: no process PID available"
+        result = "Cannot interrupt: no process PID available"
+        return f"[interrupt_current_query] {result}" if _DEBUG else result
         
     if not _connection_port:
-        return "Cannot interrupt: no connection port available"
+        result = "Cannot interrupt: no connection port available"
+        return f"[interrupt_current_query] {result}" if _DEBUG else result
     
     task = _current_async_task
     
     # Check if task is already completed
     if not task["thread"].is_alive():
-        return "Query already completed, nothing to interrupt"
+        if task["result_container"]["error"]:
+            if task["status"] == "Timed out":
+                result = f"Query already timed out: {task['result_container']['error']}"
+            else:
+                result = f"Query already failed: {task['result_container']['error']}"
+        else:
+            result = "Query already completed successfully, nothing to interrupt"
+        return f"[interrupt_current_query] {result}" if _DEBUG else result
     
     try:
         # Verify the stored PID still matches the process on our port
@@ -365,13 +429,15 @@ def interrupt_current_query() -> str:
         task["status"] = "Interrupted"
         
         elapsed = time.time() - task["started"]
-        return f"Query interrupted after {elapsed:.1f}s"
+        result = f"Query interrupted after {elapsed:.1f}s"
+        return f"[interrupt_current_query] {result}" if _DEBUG else result
         
     except ValueError as e:
         # Re-raise PID mismatch errors
         raise e
     except Exception as e:
-        return f"Failed to interrupt query: {str(e)}"
+        result = f"Failed to interrupt query: {str(e)}"
+        return f"[interrupt_current_query] {result}" if _DEBUG else result
 
 
 @mcp.tool()
@@ -385,21 +451,24 @@ def get_current_task_result() -> str:
     global _current_async_task
     
     if not _current_async_task:
-        return "No async task to get result from"
+        result = "No async task to get result from"
+        return f"[get_current_task_result] {result}" if _DEBUG else result
     
     task = _current_async_task
     
     if task["thread"].is_alive():
         elapsed = time.time() - task["started"]
-        return f"Query still running ({elapsed:.1f}s elapsed). Check status with get_current_task_status()."
+        result = f"Query still running ({elapsed:.1f}s elapsed). Check status with get_current_task_status()."
+        return f"[get_current_task_result] {result}" if _DEBUG else result
     
     if task["result_container"]["error"]:
-        return f"Query failed: {task['result_container']['error']}"
+        result = f"Query failed: {task['result_container']['error']}"
+        return f"[get_current_task_result] {result}" if _DEBUG else result
     
     # Return result and clear the task
     result = task["result_container"]["result"]
     _current_async_task = None
-    return result
+    return f"[get_current_task_result] {result}" if _DEBUG else result
 
 
 def main():
