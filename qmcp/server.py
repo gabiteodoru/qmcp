@@ -28,7 +28,8 @@ _q_process_pid = None  # Store q process PID for safe interruption
 
 # Timeout configuration
 _switch_to_async_timeout = 1     # seconds before switching to async mode
-_interrupt_timeout = 10          # seconds before sending SIGINT to q process
+# Set interrupt timeout to None on Windows (SIGINT not supported)
+_interrupt_timeout = None if platform.system() == 'Windows' else 10  # seconds before sending SIGINT to q process
 _connection_timeout = 2          # seconds to wait for connection to establish
 
 # Async task management
@@ -75,9 +76,9 @@ def connect_to_q(host: str = None) -> str:
         is_windows = platform.system() == 'Windows'
         if _connection_port and (_q_process_pid is None or is_windows):
             if is_windows:
-                pid_status = " Warning: Windows detected - SIGINT functionality disabled."
+                pid_status = " Warning: Windows detected - interrupt functionality disabled."
             else:
-                pid_status = " Warning: Failed to find q process PID - SIGINT functionality disabled. If q server is running across WSL-Windows divide, this is expected."
+                pid_status = " Warning: Failed to find q process PID - interrupt functionality disabled. If q server is running across WSL-Windows divide, this is expected."
             
         result = f"Connected to q server. {getTimeoutsStr(_switch_to_async_timeout, _interrupt_timeout, _connection_timeout)}){pid_status}"
         return f"[connect_to_q] {result}" if _DEBUG else result
@@ -405,7 +406,7 @@ def interrupt_current_query() -> str:
         return f"[interrupt_current_query] {result}" if _DEBUG else result
     
     if platform.system() == 'Windows':
-        result = "Cannot interrupt: SIGINT functionality disabled on Windows"
+        result = "Cannot interrupt: interrupt functionality disabled on Windows"
         return f"[interrupt_current_query] {result}" if _DEBUG else result
     
     if not _q_process_pid:
