@@ -13,6 +13,7 @@ import time
 import psutil
 import signal
 import os
+import platform
 from . import qlib
 from .util import getTimeoutsStr, find_process_by_port
 from . import codehelper
@@ -71,8 +72,12 @@ def connect_to_q(host: str = None) -> str:
         _q_process_pid = find_process_by_port(_connection_port)
         
         pid_status = ""
-        if _connection_port and _q_process_pid is None:
-            pid_status = " Warning: Failed to find q process PID - SIGINT functionality disabled. If q server is running across WSL-Windows divide, this is expected."
+        is_windows = platform.system() == 'Windows'
+        if _connection_port and (_q_process_pid is None or is_windows):
+            if is_windows:
+                pid_status = " Warning: Windows detected - SIGINT functionality disabled."
+            else:
+                pid_status = " Warning: Failed to find q process PID - SIGINT functionality disabled. If q server is running across WSL-Windows divide, this is expected."
             
         result = f"Connected to q server. {getTimeoutsStr(_switch_to_async_timeout, _interrupt_timeout, _connection_timeout)}){pid_status}"
         return f"[connect_to_q] {result}" if _DEBUG else result
@@ -188,8 +193,8 @@ def _query_q(command: str, low_level = False, expr = None) -> str:
     thread = threading.Thread(target=execute, daemon=True)
     thread.start()
     
-    # Start the interrupt monitor thread if timeout is configured AND we have PID
-    if _interrupt_timeout and _q_process_pid:
+    # Start the interrupt monitor thread if timeout is configured AND we have PID AND not on Windows
+    if _interrupt_timeout and _q_process_pid and platform.system() != 'Windows':
         interrupt_thread = threading.Thread(target=monitor_and_interrupt, daemon=True)
         interrupt_thread.start()
     
@@ -213,7 +218,14 @@ def _query_q(command: str, low_level = False, expr = None) -> str:
             "started": time.time(),
             "result_container": result_container
         }
-        interrupt_msg = f" Will auto-interrupt after {_interrupt_timeout}s." if _interrupt_timeout else ""
+        interrupt_msg = ""
+        if _interrupt_timeout and _q_process_pid and platform.system() != 'Windows':
+            interrupt_msg = f" Will auto-interrupt after {_interrupt_timeout}s."
+        elif _interrupt_timeout and platform.system() == 'Windows':
+            interrupt_msg = " (Auto-interrupt disabled on Windows)"
+        elif _interrupt_timeout and not _q_process_pid:
+            interrupt_msg = " (Auto-interrupt disabled - no process PID)"
+        
         result = f"Query taking longer than {_switch_to_async_timeout}s, switched to async mode.{interrupt_msg} Check status with get_current_task_status()."
         return f"[_query_q] {result}" if _DEBUG else result
 
@@ -390,6 +402,10 @@ def interrupt_current_query() -> str:
     
     if not _current_async_task:
         result = "No async task running to interrupt"
+        return f"[interrupt_current_query] {result}" if _DEBUG else result
+    
+    if platform.system() == 'Windows':
+        result = "Cannot interrupt: SIGINT functionality disabled on Windows"
         return f"[interrupt_current_query] {result}" if _DEBUG else result
     
     if not _q_process_pid:

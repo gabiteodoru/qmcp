@@ -13,6 +13,12 @@ MCP is an open protocol created by Anthropic that enables AI systems to interact
 - Programmatic query cancellation (Ctrl+C equivalent)
 - Graceful handling of long-running queries
 
+## Windows Users: WSL Recommendation
+
+**⚠️ Important for Windows users**: For optimal functionality, it is highly recommended to run both the MCP server and your q session inside WSL (Windows Subsystem for Linux). This ensures the server can interrupt infinite loops and runaway queries that LLMs might accidentally generate.
+
+Running the MCP server on Windows (outside WSL) disables SIGINT-based query interruption functionality, which is critical for escaping problematic queries during AI-assisted development sessions.
+
 ## Architecture & Design Philosophy
 
 ### Intended Goals
@@ -52,7 +58,9 @@ Slow Query (> async switch timeout)  →  Switch to async mode
 - **Why**: AI coding tools need ability to cancel runaway queries (like developer Ctrl+C)
 - **How**: MCP server locates q process by port and sends SIGINT after configurable timeout
 - **Benefit**: Prevents development sessions from hanging on problematic queries
-- **Limitation**: SIGINT functionality not implemented when MCP server and q session run on opposite sides of WSL/Windows divide
+- **Limitations**: SIGINT functionality disabled when:
+  - MCP server runs on Windows (outside WSL)
+  - MCP server and q session run on opposite sides of WSL/Windows divide
 
 #### **Development-Oriented Process Management**
 - **Why**: Coding tools work with user-managed development q servers
@@ -222,6 +230,12 @@ The `connect_to_q(host)` tool uses flexible fallback logic:
 
 When using the MCP server, be aware of these limitations:
 
+### Query Interruption (SIGINT) Limitations
+- **Windows Platform**: Query interruption disabled when MCP server runs on Windows (outside WSL)
+- **Cross-Platform Setup**: Query interruption disabled when MCP server and q session run on opposite sides of WSL/Windows divide
+- **Impact**: LLM cannot automatically escape infinite loops or cancel runaway queries in these configurations
+
+### Data Conversion Limitations
 - **Keyed tables**: Operations like `1!table` may fail during pandas conversion
 - **String vs Symbol distinction**: q strings and symbols may appear identical in output
 - **Type ambiguity**: Use q's `meta` and `type` commands to determine actual data types when precision matters
