@@ -14,9 +14,19 @@ import psutil
 import signal
 import os
 import platform
-from . import qlib
-from .util import getTimeoutsStr, find_process_by_port
-from . import codehelper
+import sys
+import os
+
+# Add parent directory to path when run directly
+if __name__ == "__main__":
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    import qmcp.qlib as qlib
+    from qmcp.util import getTimeoutsStr, find_process_by_port
+    import qmcp.codehelper as codehelper
+else:
+    from . import qlib
+    from .util import getTimeoutsStr, find_process_by_port
+    from . import codehelper
 
 # Initialize the MCP server
 mcp = FastMCP("qmcp")
@@ -486,6 +496,93 @@ def get_current_task_result() -> str:
     result = task["result_container"]["result"]
     _current_async_task = None
     return f"[get_current_task_result] {result}" if _DEBUG else result
+
+
+@mcp.tool()
+def translate_qython_to_q(qython_code: str) -> str:
+    """
+    ⚠️ EXPERIMENTAL: Translate Qython code to Q code - Output may be incorrect, please verify
+    
+    Qython is Python-like syntax with q-functional constructs:
+    - `do n times:` for fixed iteration (equivalent to `for _ in range(n):`)
+    - `converge(func, starting_from=val)` for functional convergence (built-in tolerance)
+    - `reduce(binary_func, iterable)` for cumulative operations
+    - `range(n)` for generating integer sequences [0, 1, ..., n-1]
+    - No `for` loops, `elif`, tuple assignment, or `break/continue`
+    - Use lists `[a, b, c]` instead of tuples `(a, b, c)`
+    
+    Examples:
+    ```python
+    # Compound Interest
+    def compound_growth(principal, rate, years):
+        amount = principal
+        do years times:
+            amount = amount * (1 + rate)
+        return amount
+    
+    # Golden Section Search
+    def golden_section_search(f, a, b):
+        # tolerance is not provided as when using converge it's unnecessary
+        phi = (1 + 5**0.5) / 2
+        resphi = 2 - phi
+        x1 = a + resphi * (b - a)
+        x2 = b - resphi * (b - a)
+        f1 = f(x1)
+        f2 = f(x2)
+        
+        def step(state):
+            # Extract state values
+            state_a = state[0]
+            state_b = state[1]
+            state_x1 = state[2]
+            state_x2 = state[3]
+            state_f1 = state[4]
+            state_f2 = state[5]
+            
+            if state_f1 > state_f2:
+                new_a = state_x1
+                new_x1 = state_x2
+                new_f1 = state_f2
+                new_x2 = state_b - resphi * (state_b - new_a)
+                new_f2 = f(new_x2)
+                new_b = state_b
+            
+            if state_f1 <= state_f2:
+                new_b = state_x2
+                new_x2 = state_x1
+                new_f2 = state_f1
+                new_x1 = state_a + resphi * (new_b - state_a)
+                new_f1 = f(new_x1)
+                new_a = state_a
+            
+            return [new_a, new_b, new_x1, new_x2, new_f1, new_f2]
+        
+        initial_state = [a, b, x1, x2, f1, f2]
+        final_state = converge(step, starting_from=initial_state)
+        result_a = final_state[0]
+        result_b = final_state[1]
+        return (result_a + result_b) / 2
+    ```
+    
+    Args:
+        qython_code: Qython source code to translate
+        
+    Returns:
+        Equivalent Q code
+    """
+    if __name__ == "__main__":
+        import qmcp.translate as translate
+    else:
+        from . import translate
+    import os
+    
+    # Change to the directory containing the grammar file
+    original_cwd = os.getcwd()
+    try:
+        os.chdir(os.path.dirname(__file__))
+        return translate.translate(qython_code)
+    finally:
+        os.chdir(original_cwd)
 
 
 def main():

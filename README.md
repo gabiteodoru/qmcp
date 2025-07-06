@@ -12,6 +12,7 @@ MCP is an open protocol created by Anthropic that enables AI systems to interact
 - Intelligent async query handling with configurable timeouts
 - Programmatic query cancellation (Ctrl+C equivalent)
 - Graceful handling of long-running queries
+- **NEW:** Qython language translator (Experimental Alpha)
 
 ## Windows Users: WSL Recommendation
 
@@ -215,16 +216,25 @@ The `connect_to_q(host)` tool uses flexible fallback logic:
 4. **Hostname only**: Use as hostname with `Q_DEFAULT_HOST` port/auth or default port
    - `connect_to_q("myhost")` → Combines with `Q_DEFAULT_HOST` settings
 
-### Tools
+### Tool Stability Status
 
-1. `connect_to_q(host=None)` - Connect to q server with fallback logic
-2. `query_q(command)` - Execute q commands and return results
-3. `set_timeout_switch_to_async(seconds)` - Configure when queries switch to async mode
-4. `set_timeout_interrupt_q(seconds)` - Configure when to send SIGINT to cancel queries
-5. `set_timeout_connection(seconds)` - Configure connection timeout
-6. `get_timeout_settings()` - View current timeout configuration
-7. `get_current_task_status()` - Check status of running async query
-8. `get_current_task_result()` - Retrieve result of completed async query
+**Production-Ready Tools:**
+- `connect_to_q` - Stable connection management with fallback logic
+- `query_q` - Execute queries with intelligent async timeout control
+- `set_timeout_switch_to_async` - Configure when queries switch to async mode
+- `set_timeout_interrupt_q` - Configure when to send SIGINT to cancel queries  
+- `set_timeout_connection` - Configure connection timeout
+- `get_timeout_settings` - View current timeout configuration
+- `get_current_task_status` - Check status of running async query
+- `get_current_task_result` - Retrieve result of completed async query
+- `interrupt_current_query` - Send SIGINT to interrupt running queries
+
+**Experimental Tools (Alpha):**
+- `translate_qython_to_q` - ⚠️ **EXPERIMENTAL**: Python-like syntax to q translator
+  - Qython supports: `do n times:`, `converge()`, `reduce()`, `range()`
+  - Limited vocabulary, may produce incorrect code
+  - **Please verify all output before use**
+  - Report bugs at [GitHub Issues](https://github.com/gabiteodoru/qmcp/issues)
 
 ## Known Limitations
 
