@@ -259,7 +259,15 @@ def translate(code):
     # Load custom grammar with extended syntax support
     import os
     grammar_path = os.path.join(os.path.dirname(__file__), 'custom_grammar.txt')
-    custom_grammar = parso.load_grammar(path=grammar_path)
+    
+    # Check if custom grammar file exists before trying to load it
+    if not os.path.exists(grammar_path):
+        raise FileNotFoundError(f"Custom grammar file not found: {grammar_path}")
+    
+    try:
+        custom_grammar = parso.load_grammar(path=grammar_path)
+    except Exception as e:
+        raise RuntimeError(f"Failed to load custom grammar from {grammar_path}: {e}") from e
     
     # Parse the AST using custom grammar
     tree = custom_grammar.parse(code)

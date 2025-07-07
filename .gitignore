@@ -64,3 +64,6 @@ reinstallmcp.sh
 debug_server.sh
 test_mcp.py
 test_server.sh
+
+# Private tests directory
+private_tests/
