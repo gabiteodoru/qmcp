@@ -258,7 +258,7 @@ def translate(code):
     """
     # Load custom grammar with extended syntax support
     import os
-    grammar_path = os.path.join(os.getcwd(), 'custom_grammar.txt')
+    grammar_path = os.path.join(os.path.dirname(__file__), 'custom_grammar.txt')
     custom_grammar = parso.load_grammar(path=grammar_path)
     
     # Parse the AST using custom grammar

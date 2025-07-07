@@ -31,6 +31,15 @@ else:
 # Initialize the MCP server
 mcp = FastMCP("qmcp")
 
+# Register Qython grammar as MCP resource
+@mcp.resource("qython://grammar")
+async def get_qython_grammar():
+    """Get the Qython language grammar specification"""
+    import os
+    grammar_path = os.path.join(os.path.dirname(__file__), 'custom_grammar.txt')
+    with open(grammar_path, 'r') as f:
+        return f.read()
+
 # Global connection state
 _q_connection = None
 _connection_port = None
@@ -504,7 +513,7 @@ def translate_qython_to_q(qython_code: str) -> str:
     ⚠️ EXPERIMENTAL: Translate Qython code to Q code - Output may be incorrect, please verify
     
     Qython is Python-like syntax with q-functional constructs:
-    - `do n times:` for fixed iteration (equivalent to `for _ in range(n):`)
+    - `do n times:` repeat n times; same as `for _ in range(n):` but without access to iteration variable `_`
     - `converge(func, starting_from=val)` for functional convergence (built-in tolerance)
     - `reduce(binary_func, iterable)` for cumulative operations
     - `range(n)` for generating integer sequences [0, 1, ..., n-1]
