@@ -26,3 +26,6 @@ dependencies = [
 
 [project.scripts]
 qmcp = "qmcp.server:main"
+
+[tool.setuptools.package-data]
+qmcp = ["custom_grammar.txt"]
