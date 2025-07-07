@@ -47,6 +47,9 @@ qmcp-test-env/
 ehthumbs.db
 Thumbs.db
 
+# Zone.Identifier files (created by file transfers/downloads)
+*:Zone.Identifier
+
 # Testing
 .coverage
 .pytest_cache/
