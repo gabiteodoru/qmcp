@@ -7,7 +7,7 @@ name = "qmcp"
 version = "0.4.3"
 description = "MCP Server for q/kdb+ integration"
 authors = [{name = "Gabi Teodoru", email = "gabiteodoru@gmail.com"}]
-license = {text = "MIT"}
+license = "MIT"
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
@@ -26,6 +26,9 @@ dependencies = [
 
 [project.scripts]
 qmcp = "qmcp.server:main"
+
+[tool.setuptools.packages.find]
+exclude = ["private_tests*"]
 
 [tool.setuptools.package-data]
 qmcp = ["custom_grammar.txt"]
