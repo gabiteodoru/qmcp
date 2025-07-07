@@ -516,7 +516,7 @@ def translate_qython_to_q(qython_code: str) -> str:
     - `do n times:` repeat n times; same as `for _ in range(n):` but without access to iteration variable `_`
     - `converge(func, starting_from=val)` for functional convergence (built-in tolerance)
     - `reduce(binary_func, iterable)` for cumulative operations
-    - `range(n)` for generating integer sequences [0, 1, ..., n-1]
+    - `range(n)` for generating integer sequences [0, 1, ..., n-1] (single parameter only; for `range(a,b)` use `a+range(b-a)`)
     - No `for` loops, `elif`, tuple assignment, or `break/continue`
     - Use lists `[a, b, c]` instead of tuples `(a, b, c)`
     
