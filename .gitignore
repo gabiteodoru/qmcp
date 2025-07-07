@@ -47,7 +47,7 @@ qmcp-test-env/
 ehthumbs.db
 Thumbs.db
 
-# Zone.Identifier files (created by file transfers/downloads)
+# Windows Zone.Identifier files
 *:Zone.Identifier
 
 # Testing
