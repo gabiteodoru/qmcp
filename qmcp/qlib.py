@@ -3,11 +3,12 @@ Q/kdb+ connection utilities for qmcp
 Clean, minimal interface for connecting to and querying q servers
 """
 
-from .qpython_compat import QConnection, MetaData
+from qpython.qconnection import QConnection
+from qpython import MetaData
 import os
 import time
 import socket
-from .sugar import dmap, spl
+from sugar import dmap, spl
 import pandas as pd
 import numpy as np
 

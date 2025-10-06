@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qmcp"
-version = "0.4.4"
+version = "0.4.5"
 description = "MCP Server for q/kdb+ integration"
 authors = [{name = "Gabi Teodoru", email = "gabiteodoru@gmail.com"}]
 license = "MIT"
@@ -17,6 +17,10 @@ dependencies = [
     "more_itertools",
     "psutil",
     "parso",
+    "gabiteodoru-sugar",
+    "gabiteodoru-qpython",
+    "gabiteodoru-qython",
+    "gabiteodoru-parseq",
 ]
 
 [project.urls]
@@ -28,7 +32,10 @@ dependencies = [
 qmcp = "qmcp.server:main"
 
 [tool.setuptools.packages.find]
-exclude = ["private_tests*"]
+exclude = ["private_tests*", "bak*"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["*.sh"]
 
 [tool.setuptools.package-data]
 qmcp = ["custom_grammar.txt"]

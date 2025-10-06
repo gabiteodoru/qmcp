@@ -239,8 +239,18 @@ The `connect_to_q(host)` tool uses flexible fallback logic:
 
 **Experimental Tools (Alpha):**
 - `translate_qython_to_q` - ⚠️ **EXPERIMENTAL**: Python-like syntax to q translator
-  - Qython supports: `do n times:`, `converge()`, `reduce()`, `range()`
+  - Qython supports: `do n times:`, `converge()`, `partial()`, `reduce()`, `arange()`
+  - Assumes imports: `from functools import partial`, `from numpy import arange`
+  - Encourages vectorized, numpy-style operations over basic Python loops
   - Limited vocabulary, may produce incorrect code
+  - **Please verify all output before use**
+- `translate_q_to_qython` - ⚠️ **EXPERIMENTAL**: Q code to Python-like translator with AI disambiguation
+  - Uses ParseQ to convert q expressions into readable, well-documented Python-like code
+  - Parses q AST, flattens nested calls, and uses AI to disambiguate overloaded operators
+  - **Requires q connection first** - run `connect_to_q` tool before using (uses q's own parser)
+  - **Namespace Impact**: Creates variables and functions in the `.parseq` namespace of your q session
+  - **Hardwired to Claude Code CLI** - unlike other tools that work with any MCP-compatible LLM, this tool specifically calls Claude Code CLI for AI disambiguation
+  - May produce incorrect translations, especially for complex expressions
   - **Please verify all output before use**
   - Report bugs at [GitHub Issues](https://github.com/gabiteodoru/qmcp/issues)
 

@@ -15,24 +15,21 @@ import signal
 import os
 import platform
 import sys
-import os
 
 # Add parent directory to path when run directly
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     import qmcp.qlib as qlib
     from qmcp.util import getTimeoutsStr, find_process_by_port
-    import qmcp.codehelper as codehelper
 else:
     from . import qlib
     from .util import getTimeoutsStr, find_process_by_port
-    from . import codehelper
 
 # Initialize the MCP server
 mcp = FastMCP("qmcp")
 
 # Register Qython grammar as MCP resource
-@mcp.resource("qython://grammar")
+# @mcp.resource("qython://grammar")
 async def get_qython_grammar():
     """Get the Qython language grammar specification"""
     import os
@@ -249,119 +246,6 @@ def _query_q(command: str, low_level = False, expr = None) -> str:
         result = f"Query taking longer than {_switch_to_async_timeout}s, switched to async mode.{interrupt_msg} Check status with get_current_task_status()."
         return f"[_query_q] {result}" if _DEBUG else result
 
-#@mcp.tool()
-def parse(expr: str) -> str:
-    """
-    Parse a q expression and return a human-readable representation
-    
-    This tool analyzes q code syntax and structure. Use this when q queries fail 
-    and you suspect syntax issues - it can help identify structural problems.
-    
-    Args:
-        expr: q expression to parse and analyze
-        
-    Returns:
-        Human-readable string representation of the parsed expression
-        
-    Example:
-        parse("a lj 2!select min s, maxs t from c") 
-        -> "[Func[lj], Symbol[a], [Func[!], Long[2], [Func[?], Symbol[c], [], Bool[0], Dict(LSymbol[s, t]: [[Func[min], Symbol[s]], [Func[maxs], Symbol[t]]])]]]"
-    """
-    result = codehelper.parse(_query_q, expr)
-    return f"[parse] {result}" if _DEBUG else result
-
-@mcp.tool()
-def set_timeout_switch_to_async(seconds: int = None) -> str:
-    """
-    Set timeout to switch query to async mode
-    
-    Args:
-        seconds: Timeout in seconds, or None to disable async switching
-        
-    Returns:
-        Status message
-    """
-    global _switch_to_async_timeout
-    
-    if seconds is not None and seconds < 0:
-        result = "Error: Timeout cannot be negative"
-        return f"[set_timeout_switch_to_async] {result}" if _DEBUG else result
-    
-    if seconds is None:
-        _switch_to_async_timeout = None
-        result = "Async switching disabled"
-        return f"[set_timeout_switch_to_async] {result}" if _DEBUG else result
-    
-    _switch_to_async_timeout = seconds
-    result = f"Will switch to async mode after {seconds} seconds"
-    return f"[set_timeout_switch_to_async] {result}" if _DEBUG else result
-
-
-@mcp.tool()
-def set_timeout_interrupt_q(seconds: int = None) -> str:
-    """
-    Set timeout to send SIGINT to q process
-    
-    Args:
-        seconds: Timeout in seconds, or None to disable auto-interrupt
-        
-    Returns:
-        Status message
-    """
-    global _interrupt_timeout
-    
-    if seconds is not None and seconds < 0:
-        result = "Error: Timeout cannot be negative"
-        return f"[set_timeout_interrupt_q] {result}" if _DEBUG else result
-    
-    if seconds is None:
-        _interrupt_timeout = None
-        result = "Auto-interrupt disabled"
-        return f"[set_timeout_interrupt_q] {result}" if _DEBUG else result
-    
-    _interrupt_timeout = seconds
-    result = f"Will send SIGINT after {seconds} seconds"
-    return f"[set_timeout_interrupt_q] {result}" if _DEBUG else result
-
-
-@mcp.tool()
-def set_timeout_connection(seconds: int = None) -> str:
-    """
-    Set timeout for establishing connection to q server
-    
-    Args:
-        seconds: Timeout in seconds, or None to use default (5s)
-        
-    Returns:
-        Status message
-    """
-    global _connection_timeout
-    
-    if seconds is not None and seconds <= 0:
-        result = "Error: Connection timeout must be positive"
-        return f"[set_timeout_connection] {result}" if _DEBUG else result
-    
-    if seconds is None:
-        _connection_timeout = 5  # Default to qpython's original 5s
-        result = "Connection timeout reset to default (5s)"
-        return f"[set_timeout_connection] {result}" if _DEBUG else result
-    
-    _connection_timeout = seconds
-    result = f"Connection timeout set to {seconds} seconds"
-    return f"[set_timeout_connection] {result}" if _DEBUG else result
-
-
-@mcp.tool()
-def get_timeout_settings() -> str:
-    """
-    Show current timeout settings
-    
-    Returns:
-        Current timeout configuration
-    """
-    result = getTimeoutsStr(_switch_to_async_timeout, _interrupt_timeout, _connection_timeout)
-    return f"[get_timeout_settings] {result}" if _DEBUG else result
-
 
 @mcp.tool()
 def get_current_task_status(wait_seconds: int = None) -> str:
@@ -512,13 +396,23 @@ def translate_qython_to_q(qython_code: str) -> str:
     """
     ⚠️ EXPERIMENTAL: Translate Qython code to Q code - Output may be incorrect, please verify
     
-    Qython is Python-like syntax with q-functional constructs:
+    Qython is Python-like syntax with q-functional constructs.
+    
+    Assumed imports (already available):
+    ```python
+    from functools import partial
+    from numpy import arange
+    ```
+    
+    Qython constructs:
     - `do n times:` repeat n times; same as `for _ in range(n):` but without access to iteration variable `_`
-    - `converge(func, starting_from=val)` for functional convergence (built-in tolerance)
+    - `converge(func, starting_from=val)` or `converge(func)` for functional convergence (built-in tolerance)
+    - `partial(func, *args)` for partial function application (None args create empty positions)
     - `reduce(binary_func, iterable)` for cumulative operations
-    - `range(n)` for generating integer sequences [0, 1, ..., n-1] (single parameter only; for `range(a,b)` use `a+range(b-a)`)
+    - `arange(n)` for generating integer sequences [0, 1, ..., n-1] (single parameter only)
     - No `for` loops, `elif`, tuple assignment, or `break/continue`
     - Use lists `[a, b, c]` instead of tuples `(a, b, c)`
+    - Encourages vectorized, numpy-style operations over basic Python loops
     
     Examples:
     ```python
@@ -579,19 +473,158 @@ def translate_qython_to_q(qython_code: str) -> str:
     Returns:
         Equivalent Q code
     """
-    if __name__ == "__main__":
-        import qmcp.translate as translate
-    else:
-        from . import translate
-    import os
+    from qython.translate import translate
     
     # Change to the directory containing the grammar file
     original_cwd = os.getcwd()
     try:
         os.chdir(os.path.dirname(__file__))
-        return translate.translate(qython_code)
+        return translate(qython_code)
     finally:
         os.chdir(original_cwd)
+
+# @mcp.tool()
+def ask_claude(question: str) -> str:
+    """
+    Ask Claude a question
+    """
+    try:
+        from parseq import ask_claude as parseq_ask_claude
+        result = parseq_ask_claude(question)
+        return result
+    except Exception as e:
+        import traceback
+        return f"Error in ask_claude: {str(e)}\nTraceback: {traceback.format_exc()}"
+    
+@mcp.tool()
+def translate_q_to_qython(q_code: str) -> str:
+    """
+    Translate Q code to Python-like code with AI-powered disambiguation
+    
+    This tool uses ParseQ to convert q expressions into readable, well-documented 
+    Python-like code by parsing the q AST, flattening nested calls, and using AI 
+    to disambiguate heavily overloaded q operators.
+    
+    PREREQUISITE: Must connect to q server first using connect_to_q tool.
+    
+    Args:
+        q_code: Q expression to translate
+        
+    Returns:
+        Python-like code with explanatory comments
+        
+    Example:
+        translate_q_to_qython("a lj 2!select min s from c")
+        -> # Select/Exec - functional qSQL query...
+           temp1 = query(c, [], False, {s: [min, s]})
+           # Enkey - makes first 2 columns the key...
+           temp2 = bang(2, temp1)
+           # Left join - joins table a with temp2
+           result = lj(a, temp2)
+    """
+    original_cwd = os.getcwd()
+    try:
+        from parseq import translate, parseq
+        os.chdir(os.path.dirname(__file__))
+        assert _q_connection is not None, "Must connect to q server first using connect_to_q tool"
+        return translate(q_code, _q_connection)
+    except Exception as e:
+        return f"Translation failed: {str(e)}. Note: This tool requires Claude Code CLI to be installed and available in PATH."
+    finally:
+        os.chdir(original_cwd)
+
+@mcp.tool()
+def set_timeout_switch_to_async(seconds: int = None) -> str:
+    """
+    Set timeout to switch query to async mode
+    
+    Args:
+        seconds: Timeout in seconds, or None to disable async switching
+        
+    Returns:
+        Status message
+    """
+    global _switch_to_async_timeout
+    
+    if seconds is not None and seconds < 0:
+        result = "Error: Timeout cannot be negative"
+        return f"[set_timeout_switch_to_async] {result}" if _DEBUG else result
+    
+    if seconds is None:
+        _switch_to_async_timeout = None
+        result = "Async switching disabled"
+        return f"[set_timeout_switch_to_async] {result}" if _DEBUG else result
+    
+    _switch_to_async_timeout = seconds
+    result = f"Will switch to async mode after {seconds} seconds"
+    return f"[set_timeout_switch_to_async] {result}" if _DEBUG else result
+
+
+@mcp.tool()
+def set_timeout_interrupt_q(seconds: int = None) -> str:
+    """
+    Set timeout to send SIGINT to q process
+    
+    Args:
+        seconds: Timeout in seconds, or None to disable auto-interrupt
+        
+    Returns:
+        Status message
+    """
+    global _interrupt_timeout
+    
+    if seconds is not None and seconds < 0:
+        result = "Error: Timeout cannot be negative"
+        return f"[set_timeout_interrupt_q] {result}" if _DEBUG else result
+    
+    if seconds is None:
+        _interrupt_timeout = None
+        result = "Auto-interrupt disabled"
+        return f"[set_timeout_interrupt_q] {result}" if _DEBUG else result
+    
+    _interrupt_timeout = seconds
+    result = f"Will send SIGINT after {seconds} seconds"
+    return f"[set_timeout_interrupt_q] {result}" if _DEBUG else result
+
+
+@mcp.tool()
+def set_timeout_connection(seconds: int = None) -> str:
+    """
+    Set timeout for establishing connection to q server
+    
+    Args:
+        seconds: Timeout in seconds, or None to use default (5s)
+        
+    Returns:
+        Status message
+    """
+    global _connection_timeout
+    
+    if seconds is not None and seconds <= 0:
+        result = "Error: Connection timeout must be positive"
+        return f"[set_timeout_connection] {result}" if _DEBUG else result
+    
+    if seconds is None:
+        _connection_timeout = 5  # Default to qpython's original 5s
+        result = "Connection timeout reset to default (5s)"
+        return f"[set_timeout_connection] {result}" if _DEBUG else result
+    
+    _connection_timeout = seconds
+    result = f"Connection timeout set to {seconds} seconds"
+    return f"[set_timeout_connection] {result}" if _DEBUG else result
+
+
+@mcp.tool()
+def get_timeout_settings() -> str:
+    """
+    Show current timeout settings
+    
+    Returns:
+        Current timeout configuration
+    """
+    result = getTimeoutsStr(_switch_to_async_timeout, _interrupt_timeout, _connection_timeout)
+    return f"[get_timeout_settings] {result}" if _DEBUG else result
+
 
 
 def main():
