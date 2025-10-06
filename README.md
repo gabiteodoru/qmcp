@@ -4,6 +4,14 @@ A Model Context Protocol (MCP) server for q/kdb+ integration.
 
 MCP is an open protocol created by Anthropic that enables AI systems to interact with external tools and data sources. While currently supported by Claude (Desktop and CLI), the open standard allows other LLMs to adopt it in the future.
 
+## Open-Source Proof-of-Concept
+
+This repository contains an **open-source proof-of-concept** demonstrating the core qmcp approach. The Qython translation tool (available at [github.com/gabiteodoru/qython](https://github.com/gabiteodoru/qython)) covers ~5% of the q language and is provided for evaluation and experimentation.
+
+**Production Results:** The full Qython implementation achieves 0.6% failure rate on HumanEval benchmarks, with 10x reliability improvement over native q development. See the complete evaluation: [**0.6% Failure Rate: Solving LLM Code Generation for q/kdb+**](https://medium.com/@gabiteodoru/0-6-failure-rate-solving-llm-code-generation-for-q-kdb-4b3ed29f64bd)
+
+**Commercial Licensing:** For access to the full Qython implementation with comprehensive language coverage, contact gabiteodoru@gmail.com
+
 ## Features
 
 - Connect to q/kdb+ servers
